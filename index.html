@@ -398,6 +398,17 @@ td.desc-ur { line-height: 1.9; }
 .dt-kind { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
 .dt-title { font-family: var(--font-en), Arial; font-size: 22px; font-weight: 700; color: var(--primary); line-height: 1.2; }
 
+/* ============ VIEWER ROLE (sirf totals dekh sakta hai) ============ */
+body:not(.role-viewer) #viewerView { display: none !important; }
+body.role-viewer .sidebar, body.role-viewer .hamb, body.role-viewer .side-dim, body.role-viewer .adm-only { display: none !important; }
+body.role-viewer .main { margin-left: 0 !important; }
+body.role-viewer .main > .wrap:not(#viewerView) { display: none !important; }
+body.role-viewer .hero-card { cursor: default; }
+body.role-viewer .hero-card:hover { transform: none; }
+.v-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.v-quick .btn.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.v-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); margin-left: 8px; vertical-align: middle; }
+
 @media print {
   body { background: none; }
   .no-print, #dashView, #akDashView, #udDashView, #akPrintView, #dayView { display: none !important; }
@@ -513,13 +524,31 @@ td.desc-ur { line-height: 1.9; }
         <div class="um-lbl">Theme</div>
         <div class="um-themes" id="umThemes"></div>
       </div>
-      <button class="um-it" onclick="closeUserMenu();openSettings('profile')">👤 My Profile</button>
-      <button class="um-it" onclick="closeUserMenu();openSettings('theme')">🎨 All Theme Options</button>
-      <button class="um-it" onclick="closeUserMenu();openSettings()">⚙️ Settings</button>
+      <button class="um-it adm-only" onclick="closeUserMenu();openSettings('profile')">👤 My Profile</button>
+      <button class="um-it adm-only" onclick="closeUserMenu();openSettings('theme')">🎨 All Theme Options</button>
+      <button class="um-it adm-only" onclick="closeUserMenu();openSettings()">⚙️ Settings</button>
       <button class="um-it danger" onclick="closeUserMenu();aqLogout()">⎋ Logout</button>
     </div>
   </div>
 </header>
+
+<!-- ================= VIEWER (sirf totals + date filter) ================= -->
+<div id="viewerView" class="wrap">
+  <div class="panel">
+    <div class="filters">
+      <div class="f"><label>From</label><input type="date" id="vFrom" onchange="VQ='';renderViewer()"></div>
+      <div class="f"><label>To</label><input type="date" id="vTo" onchange="VQ='';renderViewer()"></div>
+      <div class="f"><label>Quick</label><div class="v-quick">
+        <button class="btn light" data-vq="today" onclick="viewerRange('today')">Today</button>
+        <button class="btn light" data-vq="month" onclick="viewerRange('month')">This Month</button>
+        <button class="btn light" data-vq="last" onclick="viewerRange('last')">Last Month</button>
+        <button class="btn light" data-vq="year" onclick="viewerRange('year')">This Year</button>
+        <button class="btn light" data-vq="all" onclick="viewerRange('all')">All Time</button>
+      </div></div>
+    </div>
+  </div>
+  <div class="hero" id="vHero"></div>
+</div>
 
 <!-- ================= DASHBOARD ================= -->
 <div id="dashView" class="wrap">
@@ -590,6 +619,7 @@ td.desc-ur { line-height: 1.9; }
     <button class="set-tab" data-set="theme" onclick="setTab('theme')">🎨 Theme</button>
     <button class="set-tab" data-set="data" onclick="setTab('data')">💾 Backup & Restore</button>
     <button class="set-tab" data-set="security" onclick="setTab('security')">🔒 Account & Security</button>
+    <button class="set-tab" data-set="users" onclick="setTab('users')">👥 Users</button>
   </div>
 
   <!-- Profile -->
@@ -666,6 +696,26 @@ td.desc-ur { line-height: 1.9; }
         <button class="btn" style="background:#dc2626" onclick="aqLogout()">⎋ Logout</button>
       </div>
       <div id="pfSecMsg" class="pf-msg"></div>
+    </div>
+  </div>
+
+  <!-- Users (Viewer role) -->
+  <div class="set-pane hidden" id="set-users">
+    <div class="panel pf-card">
+      <h3>Add Viewer <span class="hint">— viewer sirf General Expense, Ahmad Khata aur Grand Total dekh sakta hai (date filter ke saath). Kuch add / edit / delete nahi kar sakta.</span></h3>
+      <div class="pf-form">
+        <div class="f"><label>Name</label><input type="text" id="uName" placeholder="e.g. Manager"></div>
+        <div class="f"><label>Email (login ke liye)</label><input type="email" id="uEmail" class="en" placeholder="manager@gmail.com" autocomplete="off"></div>
+        <div class="f"><label>Password (kam az kam 6)</label><input type="text" id="uPass" class="en" placeholder="••••••" autocomplete="off"></div>
+      </div>
+      <div class="pf-actions">
+        <button class="btn" style="background:#047857" onclick="aqAddUser()">+ Add Viewer</button>
+        <span id="uMsg" class="pf-msg"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Viewer Users</h3>
+      <div class="scroll"><table id="uTable"></table></div>
     </div>
   </div>
 </div>
@@ -886,7 +936,7 @@ var AQSYNC = (function () {
   var LOCAL_ONLY = { 'aq_urdu_gcache': 1 };       // sirf is computer par
   var DIRTY_KEY = 'aqx_dirty';
   var SP = Storage.prototype, oSet = SP.setItem, oRem = SP.removeItem;
-  var backend = null, ready = false, reloadTimer = null;
+  var backend = null, ready = false, reloadTimer = null, readOnly = false;
   function isSynced(k) { return typeof k === 'string' && k.indexOf('aq_') === 0 && !LOCAL_ONLY[k]; }
   function getDirty() { try { return JSON.parse(localStorage.getItem(DIRTY_KEY) || '{}') || {}; } catch (e) { return {}; } }
   function putDirty(o) { try { oSet.call(localStorage, DIRTY_KEY, JSON.stringify(o)); } catch (e) {} }
@@ -896,11 +946,11 @@ var AQSYNC = (function () {
   // localStorage par nazar: har tabdeeli dirty + upload
   SP.setItem = function (k, v) {
     oSet.call(this, k, v);
-    if (this === window.localStorage && isSynced(k)) { markDirty(k); if (ready) push(k); }
+    if (this === window.localStorage && isSynced(k) && !readOnly) { markDirty(k); if (ready) push(k); }
   };
   SP.removeItem = function (k) {
     oRem.call(this, k);
-    if (this === window.localStorage && isSynced(k)) { markDirty(k); if (ready) push(k); }
+    if (this === window.localStorage && isSynced(k) && !readOnly) { markDirty(k); if (ready) push(k); }
   };
   function setLocal(k, v) { try { oSet.call(localStorage, k, v); } catch (e) {} }
   function removeLocal(k) { try { oRem.call(localStorage, k); } catch (e) {} }
@@ -919,13 +969,13 @@ var AQSYNC = (function () {
   function refreshStatus() {
     if (!backend) return;
     if (!ready) return;
-    var n = Object.keys(getDirty()).length;
+    var n = readOnly ? 0 : Object.keys(getDirty()).length;
     if (!navigator.onLine) status('off', 'Offline — ' + (n ? n + ' change(s) pending' : 'saved on this device'));
     else if (pending || n) status('busy', 'Uploading...');
     else status('ok', 'Saved to cloud ✔');
   }
   function push(k) {
-    if (!backend || !ready) return Promise.resolve(false);
+    if (!backend || !ready || readOnly) return Promise.resolve(false);
     var v = null; try { v = localStorage.getItem(k); } catch (e) {}
     pending++; refreshStatus();
     var p = v === null ? backend.del(k) : backend.set(k, v);
@@ -944,7 +994,7 @@ var AQSYNC = (function () {
     reloadTimer = setTimeout(function () { try { if (typeof reloadAllData === 'function') reloadAllData(); } catch (e) { console.error(e); } }, 150);
   }
   function applyRemote(k, v) {          // v === null => remote mein delete
-    if (!isSynced(k) || getDirty()[k]) return false;
+    if (!isSynced(k) || (!readOnly && getDirty()[k])) return false;
     var cur = null; try { cur = localStorage.getItem(k); } catch (e) {}
     if (v === null) { if (cur !== null) { removeLocal(k); return true; } return false; }
     if (cur !== v) { setLocal(k, v); return true; }
@@ -956,9 +1006,9 @@ var AQSYNC = (function () {
     status('busy', 'Loading data from cloud...');
     return Promise.resolve(be.getAll()).then(function (remote) {
       var dirty = getDirty(), changed = false;
-      Object.keys(remote).forEach(function (k) { if (!dirty[k] && applyRemote(k, remote[k])) changed = true; });
+      Object.keys(remote).forEach(function (k) { if ((readOnly || !dirty[k]) && applyRemote(k, remote[k])) changed = true; });
       // pehli dafa: jo is computer par hai aur cloud mein nahi — upload
-      localKeys().forEach(function (k) { if (!(k in remote)) markDirty(k); });
+      if (!readOnly) localKeys().forEach(function (k) { if (!(k in remote)) markDirty(k); });
       ready = true;
       if (changed) scheduleReload();
       be.listen(function (changes) {
@@ -980,7 +1030,7 @@ var AQSYNC = (function () {
   }
   window.addEventListener('online', function () { if (ready) pushDirty(); else if (backend) attach(backend); refreshStatus(); });
   window.addEventListener('offline', refreshStatus);
-  return { attach: attach, detach: detach, flush: flush, isReady: function () { return ready; }, dirty: getDirty, status: status, pushDirty: pushDirty };
+  return { attach: attach, detach: detach, flush: flush, isReady: function () { return ready; }, dirty: getDirty, status: status, pushDirty: pushDirty, setReadOnly: function (v) { readOnly = !!v; } };
 })();
 
 /* ============ THEMES (rang + fonts + tables) ============ */
@@ -1519,6 +1569,7 @@ function refreshAll() {
   renderSidebar();
   if (DETAIL) renderDetail();
   if (!document.getElementById('historyView').classList.contains('hidden')) renderHistory();
+  if (window.AQ_ROLE === 'viewer') renderViewer();
 }
 
 function fmt(n) { return n.toLocaleString('en-US') + ' PKR'; }
@@ -2072,9 +2123,10 @@ function setTab(name) {
   SET_TAB = name;
   Array.prototype.forEach.call(document.querySelectorAll('.set-tab'), function (b) { b.classList.toggle('on', b.getAttribute('data-set') === name); });
   Array.prototype.forEach.call(document.querySelectorAll('.set-pane'), function (p) { p.classList.toggle('hidden', p.id !== 'set-' + name); });
-  var sub = { profile: 'Profile', theme: 'Theme', data: 'Backup & Restore', security: 'Account & Security' }[name];
+  var sub = { profile: 'Profile', theme: 'Theme', data: 'Backup & Restore', security: 'Account & Security', users: 'Users' }[name];
   document.getElementById('pageTitle').textContent = 'Settings — ' + sub;
   if (name === 'theme') openThemes();
+  if (name === 'users' && window.aqLoadUsers) aqLoadUsers();
   window.scrollTo(0, 0);
 }
 function openSettings(sub) { showTab('profile'); setTab(sub || SET_TAB || 'profile'); }
@@ -2440,6 +2492,59 @@ function dayOpenFor(d) {
   var o = dayLoad();
   if (o.rows.length && o.d !== d && !confirm('Your draft has entries for ' + shortDate(o.d) + '. Move the draft to ' + shortDate(d) + '?')) { showTab('day'); return; }
   o.d = d; daySave(o); showTab('day');
+}
+
+/* ============ ROLES: Admin (sab kuch) / Viewer (sirf totals) ============
+   Viewer users Settings -> Users se bante hain (Firestore: aq_roles). */
+var AQ_VIEWERS = [];
+function roleFor(email) {
+  email = String(email || '').toLowerCase().trim();
+  return AQ_VIEWERS.some(function (e) { return e.toLowerCase().trim() === email; }) ? 'viewer' : 'admin';
+}
+function applyRole(role) {
+  window.AQ_ROLE = role === 'viewer' ? 'viewer' : 'admin';
+  var v = AQ_ROLE === 'viewer';
+  try { localStorage.setItem('aqx_role', AQ_ROLE); } catch (e) {}
+  document.body.classList.toggle('role-viewer', v);
+  AQSYNC.setReadOnly(v);
+  closeUserMenu();
+  toggleSide(false);
+  if (v) {
+    document.getElementById('pageTitle').innerHTML = 'Expense Summary <span class="v-tag">View only</span>';
+    if (!document.getElementById('vFrom').value && !document.getElementById('vTo').value) viewerRange('month'); else renderViewer();
+  } else {
+    showTab('dash');
+  }
+}
+var VQ = 'month';
+function viewerRange(k) {
+  var t = new Date(), y = t.getFullYear(), m = t.getMonth() + 1, from = '', to = todayStr();
+  if (k === 'today') from = to;
+  else if (k === 'month') from = ymd(y, m, 1);
+  else if (k === 'last') { var ly = m === 1 ? y - 1 : y, lm = m === 1 ? 12 : m - 1; from = ymd(ly, lm, 1); to = ymd(ly, lm, new Date(ly, lm, 0).getDate()); }
+  else if (k === 'year') from = ymd(y, 1, 1);
+  else { from = ''; to = ''; }
+  document.getElementById('vFrom').value = from;
+  document.getElementById('vTo').value = to;
+  VQ = k;
+  renderViewer();
+}
+function renderViewer() {
+  var el = document.getElementById('vHero'); if (!el) return;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-vq]'), function (b) { b.classList.toggle('on', b.getAttribute('data-vq') === VQ); });
+  var from = document.getElementById('vFrom').value, to = document.getElementById('vTo').value;
+  var inR = function (r) { return (!from || r.d >= from) && (!to || r.d <= to); };
+  var ge = DATA.filter(inR), ak = akData().filter(inR), gt = sumOf(ge), at = sumOf(ak);
+  var all = ge.concat(ak).map(function (r) { return r.d; }).sort();
+  var start = from || all[0] || todayStr(), end = to || todayStr();
+  var period = shortDate(start) + ' → ' + shortDate(end) + (end === todayStr() ? ' (today)' : '');
+  el.innerHTML =
+    '<div class="hero-card ge"><div class="hm"><div class="hl">General Expense</div><div class="hv">' + fmt(gt) + '</div>' +
+      '<div class="hs">' + ge.length + ' entries</div><span class="hp">📅 ' + period + '</span></div></div>' +
+    '<div class="hero-card ak"><div class="hm"><div class="hl">Ahmad Khata</div><div class="hv">' + fmt(at) + '</div>' +
+      '<div class="hs">' + ak.length + ' entries</div><span class="hp">📅 ' + period + '</span></div></div>' +
+    '<div class="hero-card tot"><div class="hm"><div class="hl">Grand Total (Expense + Ahmad Khata)</div><div class="hv">' + fmt(gt + at) + '</div>' +
+      '<div class="hs">' + fmt(gt) + ' + ' + fmt(at) + '</div><span class="hp">📅 ' + period + '</span></div></div>';
 }
 
 /* ============ INIT ============ */
@@ -2986,6 +3091,7 @@ var UD = (function () {
 refreshAll();
 initDay();
 renderProfileBits();
+try { if (localStorage.getItem('aqx_role') === 'viewer') applyRole('viewer'); } catch (e) {}
 setTimeout(function () { if (!window.AQ_FB_LOADED) { AQSYNC.status('off', 'Offline — saved on this computer only'); gateHide(); } }, 8000);
 /* Ahmad Khata loaded — rebuild combined report with its dates */
 refreshAll();
@@ -2994,8 +3100,8 @@ refreshAll();
 <!-- ================= FIREBASE (Login + Cloud) ================= -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js";
-  import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
 
   window.AQ_FB_LOADED = true;
   const firebaseConfig = {
@@ -3027,6 +3133,73 @@ refreshAll();
         if (s.metadata.hasPendingWrites) return;
         cb(s.docChanges().map(c => ({ k: c.doc.id, v: c.type === 'removed' ? null : c.doc.data().v })));
       }, (e) => { console.error(e); AQSYNC.status('err', 'Cloud connection lost'); });
+    }
+  };
+
+  /* ---- Roles (aq_roles/{email} = { role: 'viewer' | 'disabled', name }) — koi doc nahi = Admin ---- */
+  const COL_ROLES = 'aq_roles';
+  let app2 = null, roleUnsub = null;
+  async function getRole(email) {
+    email = String(email || '').toLowerCase();
+    try { const s = await getDoc(doc(db, COL_ROLES, email)); return s.exists() ? (s.data().role || 'admin') : 'admin'; }
+    catch (e) { console.error(e); try { return localStorage.getItem('aqx_role') || 'admin'; } catch (_) { return 'admin'; } }
+  }
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  window.aqLoadUsers = async () => {
+    const t = document.getElementById('uTable'); if (!t || window.AQ_ROLE === 'viewer') return;
+    t.innerHTML = '<tbody><tr><td style="color:#94a3b8">⏳ Loading...</td></tr></tbody>';
+    try {
+      const snap = await getDocs(collection(db, COL_ROLES));
+      const list = []; snap.forEach(d => list.push(Object.assign({ email: d.id }, d.data())));
+      list.sort((a, b) => (b.t || 0) - (a.t || 0));
+      let h = '<thead><tr><th>#</th><th>Name</th><th>Email</th><th>Status</th><th>Added</th><th>Action</th></tr></thead><tbody>';
+      if (!list.length) h += '<tr><td colspan="6" style="color:#94a3b8">Abhi koi viewer nahi — upar se add karein</td></tr>';
+      list.forEach((u, i) => {
+        const on = u.role === 'viewer';
+        h += '<tr><td>' + (i + 1) + '</td><td>' + esc(u.name || '-') + '</td><td class="en">' + esc(u.email) + '</td>' +
+          '<td><span class="badge" style="background:' + (on ? '#16a34a' : '#94a3b8') + '">' + (on ? 'Active' : 'Disabled') + '</span></td>' +
+          '<td class="en">' + (u.t ? new Date(u.t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-') + '</td>' +
+          '<td>' + (on ? '<button class="act del" onclick="aqSetUserRole(\'' + esc(u.email) + '\',\'disabled\')">Disable</button>'
+                       : '<button class="act edit" onclick="aqSetUserRole(\'' + esc(u.email) + '\',\'viewer\')">Enable</button>') + '</td></tr>';
+      });
+      t.innerHTML = h + '</tbody>';
+    } catch (e) {
+      console.error(e);
+      t.innerHTML = '<tbody><tr><td style="color:#dc2626">Users load nahi ho sake (' + esc(e.code || 'error') + ')</td></tr></tbody>';
+    }
+  };
+  window.aqSetUserRole = async (email, role) => {
+    if (window.AQ_ROLE === 'viewer') return;
+    if (role === 'disabled' && !confirm('Disable ' + email + '?\n\nYe user login nahi kar sakega.')) return;
+    try { await setDoc(doc(db, COL_ROLES, email), { role: role }, { merge: true }); aqLoadUsers(); }
+    catch (e) { alert('Change save nahi hua (' + (e.code || 'error') + ')'); }
+  };
+  window.aqAddUser = async () => {
+    if (window.AQ_ROLE === 'viewer') return;
+    const name = $('uName').value.trim(), email = $('uEmail').value.trim().toLowerCase(), pass = $('uPass').value;
+    const m = $('uMsg'), say = (t, ok) => { m.textContent = t; m.style.color = ok ? '#16a34a' : '#dc2626'; };
+    if (!EMAIL_RE.test(email)) { say('Sahi email likhein'); $('uEmail').focus(); return; }
+    if (pass.length < 6) { say('Password kam az kam 6 characters ka ho'); $('uPass').focus(); return; }
+    if (auth.currentUser && email === String(auth.currentUser.email || '').toLowerCase()) { say('Apni (admin) email viewer nahi bana sakte'); return; }
+    say('⏳ User bana raha hoon...', true);
+    let existed = false;
+    try {
+      if (!app2) app2 = initializeApp(firebaseConfig, 'aq-creator');   // alag instance — admin logout nahi hota
+      const a2 = getAuth(app2);
+      try { await createUserWithEmailAndPassword(a2, email, pass); await signOut(a2); }
+      catch (e) { if (String(e.code || '').includes('email-already-in-use')) existed = true; else throw e; }
+      await setDoc(doc(db, COL_ROLES, email), { role: 'viewer', name: name, t: Date.now(), by: (auth.currentUser && auth.currentUser.email) || '' });
+      $('uName').value = ''; $('uEmail').value = ''; $('uPass').value = '';
+      say(existed ? '✔ ' + email + ' pehle se account tha — ab viewer hai (purana password hi chalega)'
+                  : '✔ Viewer ban gaya: ' + email + ' — ye email aur password usay de dein', true);
+      aqLoadUsers();
+    } catch (e) {
+      const c = String(e.code || '');
+      say(c.includes('weak-password') ? 'Password kamzor hai — kam az kam 6 characters'
+        : c.includes('permission') ? 'Firestore rules ne rok diya — rules update karein'
+        : c.includes('operation-not-allowed') ? 'Firebase mein Email/Password login band hai'
+        : errText(e));
     }
   };
 
@@ -3075,11 +3248,20 @@ refreshAll();
     await signOut(auth);
   };
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       $('userEmail').textContent = user.email || '';
       $('userBox').classList.remove('hidden');
       window.AQ_USER = { email: user.email || '' };
+      gateShow('load', 'Checking your account...');
+      const role = await getRole(user.email);
+      if (role === 'disabled') { window.AQ_LOGIN_MSG = 'Ye account admin ne band kar diya hai'; await signOut(auth); return; }
+      applyRole(role);
+      if (roleUnsub) { roleUnsub(); roleUnsub = null; }
+      if (role === 'viewer') roleUnsub = onSnapshot(doc(db, COL_ROLES, String(user.email || '').toLowerCase()), (s) => {
+        const r = s.exists() ? s.data().role : 'admin';
+        if (r === 'disabled') { window.AQ_LOGIN_MSG = 'Ye account admin ne band kar diya hai'; signOut(auth); }
+      }, () => {});
       if (window.renderProfileBits) renderProfileBits();
       gateShow('load', 'Welcome back! Loading your data from the cloud...');
       const sync = AQSYNC.attach(backend);
@@ -3088,10 +3270,13 @@ refreshAll();
     } else {
       if (unsub) { unsub(); unsub = null; }
       AQSYNC.detach();
+      applyRole('admin');
       $('userBox').classList.add('hidden');
       window.AQ_USER = null;
+      if (roleUnsub) { roleUnsub(); roleUnsub = null; }
       if (window.renderProfileBits) renderProfileBits();
       gateShow('login');
+      if (window.AQ_LOGIN_MSG) { gateMsg(window.AQ_LOGIN_MSG); window.AQ_LOGIN_MSG = ''; }
     }
   });
 </script>

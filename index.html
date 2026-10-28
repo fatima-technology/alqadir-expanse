@@ -409,6 +409,27 @@ body.role-viewer .hero-card:hover { transform: none; }
 .v-quick .btn.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .v-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); margin-left: 8px; vertical-align: middle; }
 
+/* ============ BULK ENTRY ============ */
+td.pcat { font-size: 11px; line-height: 1.25; }
+td.pcat .en { font-size: 9px; color: #64748b; font-family: var(--font-en), Arial, sans-serif; }
+.bulk-box { max-width: 1180px !important; max-height: 92vh; display: flex; flex-direction: column; }
+.bulk-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 8px; }
+.bulk-top .f { display: flex; flex-direction: column; gap: 3px; }
+.bulk-paste { width: 100%; min-height: 90px; font-family: var(--font-en), Arial, sans-serif; font-size: 12px; padding: 8px; border: 1px dashed var(--border); border-radius: 8px; background: var(--surface2); color: var(--text); resize: vertical; }
+.bulk-grid-wrap { overflow: auto; flex: 1; min-height: 160px; border: 1px solid var(--border); border-radius: 8px; }
+#bulkTable { font-size: 12px; }
+#bulkTable th { position: sticky; top: 0; z-index: 1; }
+#bulkTable td { padding: 2px; }
+#bulkTable input, #bulkTable select { width: 100%; min-width: 0; padding: 5px 6px; font-size: 12px; border: 1px solid transparent; background: transparent; color: var(--text); border-radius: 5px; }
+#bulkTable input:focus, #bulkTable select:focus { border-color: var(--primary); background: var(--surface); outline: none; }
+#bulkTable tr.bad td { background: #fee2e2; }
+#bulkTable tr.ok td.bamt { color: var(--amount); }
+#bulkTable td.bamt { font-family: var(--font-en), Arial, sans-serif; font-weight: 700; white-space: nowrap; min-width: 80px; }
+#bulkTable .bx { background: none; border: 0; color: #dc2626; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+.bulk-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 10px; }
+.bulk-sum { font-weight: 700; font-size: 13px; }
+.bulk-sum .en { color: var(--amount); }
+
 @media print {
   body { background: none; }
   .no-print, #dashView, #akDashView, #udDashView, #akPrintView, #dayView { display: none !important; }
@@ -561,6 +582,7 @@ body.role-viewer .hero-card:hover { transform: none; }
       <div class="f"><button class="btn light" onclick="resetFilters()">Reset</button></div>
       <div class="f"><button class="btn" onclick="addCategory()">+ Add Category</button></div>
       <div class="f"><button class="btn" style="background:#047857" onclick="showTab('day')">+ Add Entry</button></div>
+      <div class="f"><button class="btn" style="background:#7c3aed" onclick="openBulk()">📋 Bulk Entry</button></div>
     </div>
   </div>
 
@@ -587,6 +609,41 @@ body.role-viewer .hero-card:hover { transform: none; }
   <div class="panel">
     <h3>All Entries</h3>
     <div class="scroll"><table id="entryTable"></table></div>
+  </div>
+</div>
+
+<!-- ================= BULK ENTRY MODAL ================= -->
+<div id="bulkModal" class="modal hidden no-print">
+  <div class="modal-box bulk-box">
+    <h3>📋 Bulk Entry <span class="hint">— aik saath bohat si entries. Khali rows chhor di jaati hain.</span></h3>
+    <div class="bulk-top">
+      <div class="f"><label>Date (sab rows ke liye)</label><input type="date" id="bkDate" onchange="bulkSetAllDates()"></div>
+      <div class="f"><label>Type (sab rows ke liye)</label><select id="bkType" onchange="bulkSetAllTypes()">
+        <option value="">— har row alag —</option>
+        <option value="ge">General Expense</option>
+        <option value="ak">Ahmad Khata</option>
+        <option value="ud">Udhaar (print only)</option>
+      </select></div>
+      <div class="f"><label>Category (sab rows ke liye)</label><select id="bkCat" onchange="bulkSetAllCats()"></select></div>
+      <div class="f"><button class="btn light" onclick="bulkTogglePaste()">📥 Paste List</button></div>
+      <div class="f"><button class="btn light" onclick="bulkAddRows(5)">+ 5 Rows</button></div>
+    </div>
+    <div id="bkPasteBox" class="hidden" style="margin-bottom:8px">
+      <textarea id="bkPaste" class="bulk-paste" placeholder="Har line mein aik entry — description aur amount. Misal:
+Toll tax 100+50
+Petrol 2500
+Chai pani 300
+(Excel / WhatsApp se copy kar ke yahan paste karein. Date ya category bhi line mein ho to khud pakar li jaayegi.)"></textarea>
+      <div style="margin-top:6px;display:flex;gap:8px"><button class="btn" onclick="bulkFromPaste()">↓ Rows mein daalein</button><button class="btn light" onclick="bulkTogglePaste()">Close</button></div>
+    </div>
+    <div class="bulk-grid-wrap"><table id="bulkTable"></table></div>
+    <div class="bulk-foot">
+      <div class="bulk-sum" id="bkSum">—</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="background:#047857" onclick="bulkSave()">✔ Save All</button>
+        <button class="btn light" onclick="closeBulk()">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -768,7 +825,8 @@ body.role-viewer .hero-card:hover { transform: none; }
 <!-- ================= ROZANA HISAB (DAY ENTRY) ================= -->
 <div id="dayView" class="wrap hidden">
   <div class="panel no-print" id="dayForm">
-    <h3>Day Entry <span class="hint">— add all entries, check the preview, print, then press "Save All"</span></h3>
+    <h3>Day Entry <span class="hint">— add all entries, check the preview, print, then press "Save All"</span>
+      <button class="btn" style="background:#7c3aed;float:right;margin-top:-4px" onclick="openBulk()">📋 Bulk Entry</button></h3>
     <div class="filters" style="margin-bottom:10px">
       <div class="f"><label>Date</label><input type="date" id="dDate" onchange="dayDateChange()"></div>
     </div>
@@ -1743,10 +1801,13 @@ function dailyPageHTML(d, geRows, akRows, udRows) {
   var h = '<div class="page-container"><div>' +
     reportHead('Daily Expense Report (روزانہ اخراجات کی تفصیلی رپورٹ)', enDate(d) + ' (' + d + ') - ' + urDay(d)) +
     '<div class="section-title">1. General Expenses (عام اخراجات)</div>' +
-    '<table><thead><tr><th style="width:5%">نمبر</th><th style="width:33%">Description (English)</th><th style="width:33%">تفصیل (اردو)</th><th style="width:15%">Breakdown (تفصیل رقم)</th><th style="width:14%">Amount (رقم)</th></tr></thead><tbody>';
-  if (!geRows.length) h += '<tr><td colspan="5" style="color:#94a3b8">کوئی ریکارڈ نہیں (No Record)</td></tr>';
+    '<table><thead><tr><th style="width:5%">نمبر</th><th style="width:26%">Description (English)</th><th style="width:26%">تفصیل (اردو)</th><th style="width:14%">کیٹیگری (Category)</th><th style="width:15%">Breakdown (تفصیل رقم)</th><th style="width:14%">Amount (رقم)</th></tr></thead><tbody>';
+  if (!geRows.length) h += '<tr><td colspan="6" style="color:#94a3b8">کوئی ریکارڈ نہیں (No Record)</td></tr>';
   geRows.forEach(function (r, i) {
-    h += '<tr><td>' + (i + 1) + '</td><td class="desc-en">' + r.en + '</td><td class="desc-ur">' + r.ur + '</td><td class="bd">' + r.b + '</td><td class="amount">' + fmt(r.a) + '</td></tr>';
+    var C = CATS[r.c];
+    h += '<tr><td>' + (i + 1) + '</td><td class="desc-en">' + r.en + '</td><td class="desc-ur">' + r.ur + '</td>' +
+      '<td class="pcat">' + (C ? '<b style="color:' + C.color + '">' + (C.ur || C.en) + '</b><br><span class="en">' + C.en + '</span>' : '-') + '</td>' +
+      '<td class="bd">' + r.b + '</td><td class="amount">' + fmt(r.a) + '</td></tr>';
   });
   h += '</tbody></table>' +
     '<div class="section-title">2. Udhaar Khata (ادھار کھاتہ) <span style="font-weight:normal;font-size:10px;">— صرف ریکارڈ، کسی ٹوٹل میں شامل نہیں</span></div>' +
@@ -2029,6 +2090,208 @@ function dayPrint() {
   window.addEventListener('afterprint', done);
   window.print();
   setTimeout(done, 1000);
+}
+
+/* ===================================================================
+   BULK ENTRY — grid mein bohat si entries, phir aik click mein Save
+   =================================================================== */
+var BULK_SEQ = 0;
+function bkEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function bulkCatOpts(sel) {
+  return Object.keys(CATS).map(function (k) { return '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + bkEsc(CATS[k].en) + '</option>'; }).join('');
+}
+function bulkDefCat() {
+  var v = document.getElementById('bkCat').value;
+  if (v && CATS[v]) return v;
+  return CATS.toll ? 'toll' : Object.keys(CATS)[0];
+}
+/* pichli entries se category andaza */
+function bulkGuessCat(en) {
+  var k = String(en || '').toLowerCase().replace(/\s+/g, ' ').trim(); if (!k) return '';
+  for (var i = DATA.length - 1; i >= 0; i--) if (String(DATA[i].en).toLowerCase().replace(/\s+/g, ' ').trim() === k) return DATA[i].c;
+  return '';
+}
+function openBulk() {
+  if (window.AQ_ROLE === 'viewer') return;
+  var dd = document.getElementById('dDate'), d = (dd && dd.value) || todayStr();
+  document.getElementById('bkDate').value = d;
+  document.getElementById('bkType').value = 'ge';
+  document.getElementById('bkCat').innerHTML = '<option value="">— har row alag —</option>' + bulkCatOpts('');
+  document.getElementById('bkPaste').value = '';
+  document.getElementById('bkPasteBox').classList.add('hidden');
+  document.getElementById('bulkTable').innerHTML = '<thead><tr><th style="width:3%">#</th><th style="width:11%">Date</th><th style="width:11%">Type</th><th style="width:21%">Description (English / Roman)</th><th style="width:19%">Urdu (auto)</th><th style="width:12%">Category</th><th style="width:12%">Amount — 100+50</th><th style="width:8%">Total</th><th style="width:3%"></th></tr></thead><tbody id="bkBody"></tbody>';
+  bulkAddRows(10);
+  document.getElementById('bulkModal').classList.remove('hidden');
+  var f = document.querySelector('#bkBody .ben'); if (f) f.focus();
+}
+function closeBulk(force) {
+  if (!force && bulkCollect(true).filled && !confirm('Bulk entries save nahi hui. Band kar dein?')) return;
+  document.getElementById('bulkModal').classList.add('hidden');
+}
+function bulkRowHTML(r) {
+  r = r || {};
+  var id = 'bk' + (++BULK_SEQ), t = r.t || document.getElementById('bkType').value || 'ge';
+  var c = r.c || bulkDefCat();
+  return '<tr id="' + id + '">' +
+    '<td class="bnum"></td>' +
+    '<td><input type="date" class="bd8" value="' + bkEsc(r.d || document.getElementById('bkDate').value || todayStr()) + '"></td>' +
+    '<td><select class="bty" onchange="bulkRowType(this)"><option value="ge"' + (t === 'ge' ? ' selected' : '') + '>General</option><option value="ak"' + (t === 'ak' ? ' selected' : '') + '>Ahmad Khata</option><option value="ud"' + (t === 'ud' ? ' selected' : '') + '>Udhaar</option></select></td>' +
+    '<td><input type="text" class="ben en" value="' + bkEsc(r.en) + '" oninput="bulkEnInput(this)" onblur="bulkEnBlur(this)"></td>' +
+    '<td><input type="text" class="bur ur-in" value="' + bkEsc(r.ur) + '"' + (r.ur ? ' data-manual="1"' : '') + ' oninput="this.dataset.manual=this.value.trim()?\'1\':\'\'"></td>' +
+    '<td><select class="bct"' + (t !== 'ge' ? ' disabled style="opacity:.35"' : '') + (r.c ? ' data-manual="1"' : '') + ' onchange="this.dataset.manual=\'1\'">' + bulkCatOpts(c) + '</select></td>' +
+    '<td><input type="text" class="bam en" value="' + bkEsc(r.b) + '" oninput="bulkCalc()" onkeydown="bulkKey(event,this)"></td>' +
+    '<td class="bamt">—</td>' +
+    '<td><button class="bx" title="Remove" onclick="bulkDel(this)">×</button></td></tr>';
+}
+function bulkAddRows(n, rows) {
+  var body = document.getElementById('bkBody'), h = '';
+  if (rows) rows.forEach(function (r) { h += bulkRowHTML(r); });
+  else for (var i = 0; i < n; i++) h += bulkRowHTML();
+  body.insertAdjacentHTML('beforeend', h);
+  bulkCalc();
+}
+function bulkDel(btn) { var tr = btn.closest('tr'); tr.parentNode.removeChild(tr); if (!document.querySelector('#bkBody tr')) bulkAddRows(1); bulkCalc(); }
+function bulkRowType(sel) {
+  var c = sel.closest('tr').querySelector('.bct'), on = sel.value === 'ge';
+  c.disabled = !on; c.style.opacity = on ? '' : '.35';
+  bulkCalc();
+}
+function bulkEnInput(inp) {
+  var tr = inp.closest('tr'), ur = tr.querySelector('.bur');
+  if (ur.dataset.manual === '1') return;
+  var pending = [];
+  ur.value = toUrdu(inp.value, pending);
+  clearTimeout(inp._t);
+  if (pending.length) inp._t = setTimeout(function () { urGoogle(pending, function () { if (ur.dataset.manual !== '1') ur.value = toUrdu(inp.value); }); }, 350);
+}
+function bulkEnBlur(inp) {
+  var cs = inp.closest('tr').querySelector('.bct');
+  if (cs.dataset.manual === '1' || document.getElementById('bkCat').value) return;
+  var g = bulkGuessCat(inp.value); if (g && CATS[g]) cs.value = g;
+}
+function bulkKey(e, inp) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  var tr = inp.closest('tr'), next = tr.nextElementSibling;
+  if (!next) { bulkAddRows(1); next = tr.nextElementSibling; }
+  var nd = next.querySelector('.bd8'); if (nd && !nd._touched) nd.value = tr.querySelector('.bd8').value;
+  next.querySelector('.ben').focus();
+}
+function bulkSetAllDates() { var v = document.getElementById('bkDate').value; if (!v) return; document.querySelectorAll('#bkBody .bd8').forEach(function (x) { x.value = v; }); }
+function bulkSetAllTypes() { var v = document.getElementById('bkType').value; if (!v) return; document.querySelectorAll('#bkBody .bty').forEach(function (x) { x.value = v; bulkRowType(x); }); }
+function bulkSetAllCats() { var v = document.getElementById('bkCat').value; if (!v) return; document.querySelectorAll('#bkBody .bct').forEach(function (x) { x.value = v; x.dataset.manual = '1'; }); }
+function bulkTogglePaste() { var b = document.getElementById('bkPasteBox'); b.classList.toggle('hidden'); if (!b.classList.contains('hidden')) document.getElementById('bkPaste').focus(); }
+
+/* paste ki hui line ko samjho: date, description, urdu, category, amount */
+function bulkParseDate(s) {
+  s = String(s).trim(); var m;
+  if ((m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) return ymd(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))) { var y = +m[3]; if (y < 100) y += 2000; return ymd(y, +m[2], +m[1]); }
+  return '';
+}
+function bulkFindCat(s) {
+  s = String(s).toLowerCase().trim(); if (!s) return '';
+  var k = Object.keys(CATS).filter(function (k) { return k.toLowerCase() === s || String(CATS[k].en).toLowerCase() === s || String(CATS[k].ur).trim() === s; });
+  return k[0] || '';
+}
+function bulkAmt(s) { var b = String(s).replace(/,/g, '').replace(/\s+/g, ''); return /^[\d+*.]+$/.test(b) && /\d/.test(b) ? b : ''; }
+function bulkParseLine(line) {
+  var r = { en: '', ur: '', b: '', d: '', c: '' };
+  var cells = line.indexOf('\t') !== -1 ? line.split('\t') : null;
+  if (!cells) {
+    var s = line.trim().replace(/^\d+[.)]\s+/, '');   // "1. " numbering hatao
+    var dm = s.match(/^(\d{1,4}[-\/.]\d{1,2}[-\/.]\d{1,4})\s+/);
+    if (dm && bulkParseDate(dm[1])) { r.d = bulkParseDate(dm[1]); s = s.slice(dm[0].length); }
+    var am = s.match(/^(.*?)[\s:=\-–]+(?:rs\.?|pkr)?\s*([\d][\d,]*(?:\s*[+*]\s*[\d,]+)*)\s*(?:rs\.?|pkr|\/-)?\s*$/i);
+    if (am) { s = am[1]; r.b = bulkAmt(am[2]); }
+    cells = [s];
+  }
+  cells.forEach(function (c) {
+    c = String(c).trim(); if (!c) return;
+    var d = bulkParseDate(c), a = bulkAmt(c), k = bulkFindCat(c);
+    if (d && !r.d) r.d = d;
+    else if (a && !r.b) r.b = a;
+    else if (k && !r.c) { r.c = k; r._ct = c; }
+    else if (/[؀-ۿ]/.test(c) && !r.ur) r.ur = c;
+    else if (!r.en) r.en = c;
+    else r.en += ' ' + c;
+  });
+  if (!r.en && r._ct) r.en = r._ct;              // sirf category ka naam likha tha (jaise "Toll Tax") -> wahi description
+  delete r._ct;
+  if (!r.en && r.ur) r.en = r.ur;
+  if (r.en && !r.ur) r.ur = toUrdu(r.en);
+  if (!r.c) r.c = bulkGuessCat(r.en);
+  if (!r.c) delete r.c;
+  if (!r.d) delete r.d;
+  return r;
+}
+function bulkFromPaste() {
+  var lines = document.getElementById('bkPaste').value.split(/\r?\n/).filter(function (l) { return l.trim(); });
+  if (!lines.length) { alert('Pehle list paste karein'); return; }
+  var rows = lines.map(bulkParseLine).filter(function (r) { return r.en || r.b; });
+  // pehle se khali rows hata do
+  document.querySelectorAll('#bkBody tr').forEach(function (tr) {
+    if (!tr.querySelector('.ben').value.trim() && !tr.querySelector('.bam').value.trim()) tr.parentNode.removeChild(tr);
+  });
+  bulkAddRows(0, rows);
+  document.getElementById('bkPaste').value = '';
+  document.getElementById('bkPasteBox').classList.add('hidden');
+  var miss = rows.filter(function (r) { return !r.b; }).length;
+  if (miss) alert(rows.length + ' rows add ho gayi.\n' + miss + ' rows mein amount nahi mila — un mein amount likh dein.');
+}
+
+/* sab rows parho + check karo */
+function bulkCollect(quiet) {
+  var out = [], bad = 0, filled = 0, tot = { ge: 0, ak: 0, ud: 0 };
+  document.querySelectorAll('#bkBody tr').forEach(function (tr, i) {
+    tr.querySelector('.bnum').textContent = i + 1;
+    var d = tr.querySelector('.bd8').value, t = tr.querySelector('.bty').value;
+    var en = tr.querySelector('.ben').value.trim(), ur = tr.querySelector('.bur').value.trim();
+    var c = tr.querySelector('.bct').value, b = tr.querySelector('.bam').value.trim().replace(/,/g, '').replace(/\s+/g, '');
+    var amtCell = tr.querySelector('.bamt');
+    var ok = validB(b);
+    amtCell.textContent = ok ? calc(b).toLocaleString('en-US') : '—';
+    tr.classList.remove('bad', 'ok');
+    if (!en && !ur && !b) return;               // khali row
+    filled++;
+    if (!d || (!en && !ur) || !ok) { bad++; if (!quiet) tr.classList.add('bad'); return; }
+    tr.classList.add('ok');
+    var rec = { t: t, d: d, en: en || ur, ur: ur || toUrdu(en), b: b, a: calc(b) };
+    if (t === 'ge') rec.c = CATS[c] ? c : 'other';
+    tot[t] += rec.a;
+    out.push(rec);
+  });
+  return { rows: out, bad: bad, filled: filled, tot: tot };
+}
+function bulkCalc() {
+  var r = bulkCollect(true), T = r.tot;
+  document.getElementById('bkSum').innerHTML = r.rows.length + ' entries tayyar' + (r.filled - r.rows.length ? ' · <span style="color:#dc2626">' + (r.filled - r.rows.length) + ' adhuri</span>' : '') +
+    ' &nbsp;|&nbsp; General: <span class="en">' + fmt(T.ge) + '</span> · Ahmad Khata: <span class="en">' + fmt(T.ak) + '</span>' + (T.ud ? ' · Udhaar: <span class="en">' + fmt(T.ud) + '</span>' : '');
+}
+function bulkSave() {
+  var r = bulkCollect(false);
+  bulkCalc();
+  if (r.bad) { alert(r.bad + ' row(s) adhuri hain (laal rang mein).\nHar row mein Date, Description aur sahi Amount (jaise 100+50) zaroori hai.'); return; }
+  if (!r.rows.length) { alert('Koi entry nahi likhi'); return; }
+  var n = { ge: 0, ak: 0, ud: 0 };
+  r.rows.forEach(function (x) { n[x.t]++; });
+  if (!confirm(r.rows.length + ' entries save karein?\n\nGeneral Expense: ' + n.ge + ' (' + fmt(r.tot.ge) + ')\nAhmad Khata: ' + n.ak + ' (' + fmt(r.tot.ak) + ')\nUdhaar: ' + n.ud + ' (' + fmt(r.tot.ud) + ')')) return;
+  var ts = Date.now();
+  var ge = r.rows.filter(function (x) { return x.t === 'ge'; });
+  if (ge.length) {
+    var g = loadEdits();
+    ge.forEach(function (x, i) { g.n.push({ id: 'n' + ts + '_b' + i, d: x.d, en: x.en, ur: x.ur, c: x.c, b: x.b }); });
+    if (!saveEdits(g)) return;
+    ge.forEach(function (x) { logHistory('add', 'ge', { d: x.d, en: x.en, ur: x.ur, b: x.b, c: x.c }); });
+  }
+  r.rows.forEach(function (x) {
+    if (x.t === 'ak' && window.AK) AK.addRecord({ d: x.d, en: x.en, ur: x.ur, b: x.b });
+    if (x.t === 'ud' && window.UD) UD.addRecord({ d: x.d, en: x.en, ur: x.ur, b: x.b });
+  });
+  refreshAll();
+  if (!document.getElementById('dayView').classList.contains('hidden')) renderDay();
+  closeBulk(true);
+  alert('Saved ✔  ' + r.rows.length + ' entries\nGeneral ' + n.ge + ', Ahmad Khata ' + n.ak + ', Udhaar ' + n.ud);
 }
 
 function daySaveAll() {

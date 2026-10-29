@@ -1801,12 +1801,12 @@ function dailyPageHTML(d, geRows, akRows, udRows) {
   var h = '<div class="page-container"><div>' +
     reportHead('Daily Expense Report (روزانہ اخراجات کی تفصیلی رپورٹ)', enDate(d) + ' (' + d + ') - ' + urDay(d)) +
     '<div class="section-title">1. General Expenses (عام اخراجات)</div>' +
-    '<table><thead><tr><th style="width:5%">نمبر</th><th style="width:26%">Description (English)</th><th style="width:26%">تفصیل (اردو)</th><th style="width:14%">کیٹیگری (Category)</th><th style="width:15%">Breakdown (تفصیل رقم)</th><th style="width:14%">Amount (رقم)</th></tr></thead><tbody>';
+    '<table><thead><tr><th style="width:5%">نمبر</th><th style="width:26%">Description (English)</th><th style="width:26%">تفصیل (اردو)</th><th style="width:14%">Category</th><th style="width:15%">Breakdown (تفصیل رقم)</th><th style="width:14%">Amount (رقم)</th></tr></thead><tbody>';
   if (!geRows.length) h += '<tr><td colspan="6" style="color:#94a3b8">کوئی ریکارڈ نہیں (No Record)</td></tr>';
   geRows.forEach(function (r, i) {
     var C = CATS[r.c];
     h += '<tr><td>' + (i + 1) + '</td><td class="desc-en">' + r.en + '</td><td class="desc-ur">' + r.ur + '</td>' +
-      '<td class="pcat">' + (C ? '<b style="color:' + C.color + '">' + (C.ur || C.en) + '</b><br><span class="en">' + C.en + '</span>' : '-') + '</td>' +
+      '<td class="pcat">' + (C ? '<b class="en" style="color:' + C.color + '">' + C.en + '</b>' : '-') + '</td>' +
       '<td class="bd">' + r.b + '</td><td class="amount">' + fmt(r.a) + '</td></tr>';
   });
   h += '</tbody></table>' +
